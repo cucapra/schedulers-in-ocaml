@@ -88,6 +88,8 @@ def plot():
         "twopol_bin",
         "threepol",
         "threepol_bin",
+        "shifted_fcfs",
+        "shifted_fcfs_bin"
     ]:
         df = pd.read_csv(f"_build/output{i}.csv")
         make_plot(df, plt, i)

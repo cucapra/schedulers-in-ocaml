@@ -540,3 +540,32 @@ module Alg2T (Alg : Alg_t) : Alg_t = struct
 end
 
 module Extension_Ternary = Alg2T (Extension_Flat)
+
+(*************)
+(*    NWC    *)
+(*************)
+
+module Shifted_FCFS_Ternary : Alg_t = struct
+  let scheduling_transaction (s : State.t) pkt =
+    let time = Packet.time pkt in
+    let shift = Time.(to_float time +. 5.0 |> of_float) in
+    match find_flow pkt with
+    | "A" -> ([ (0, Rank.create 0.0 time); (0, Rank.create 0.0 time) ], s, shift)
+    | "B" -> ([ (1, Rank.create 0.0 time); (0, Rank.create 0.0 time) ], s, shift)
+    | "C" -> ([ (2, Rank.create 0.0 time); (0, Rank.create 0.0 time) ], s, shift)
+    | n -> failwith Printf.(sprintf "Don't know how to route flow %s." n)
+
+  let topology = Topo.one_level_ternary
+
+  let control : Control.t =
+    {
+      s = State.create 1;
+      q = Pieotree.create topology;
+      z = scheduling_transaction;
+    }
+
+  let simulate sim_length pkts =
+    Control.simulate sim_length 0.001 poprate pkts control
+end
+
+module Shifted_FCFS_Ternary_Bin = Alg2B (Shifted_FCFS_Ternary)
