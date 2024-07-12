@@ -26,9 +26,9 @@ module FCFS_Ternary : Alg_t = struct
   let scheduling_transaction (s : State.t) pkt =
     let time = Packet.time pkt in
     match find_flow pkt with
-    | "A" -> ([ (0, Rank.create 0.0 time); (0, Rank.create 0.0 time) ], s)
-    | "B" -> ([ (1, Rank.create 0.0 time); (0, Rank.create 0.0 time) ], s)
-    | "C" -> ([ (2, Rank.create 0.0 time); (0, Rank.create 0.0 time) ], s)
+    | "A" -> ([ (0, Rank.create 0.0 time); (0, Rank.create 0.0 time) ], s, Time.epoch)
+    | "B" -> ([ (1, Rank.create 0.0 time); (0, Rank.create 0.0 time) ], s, Time.epoch)
+    | "C" -> ([ (2, Rank.create 0.0 time); (0, Rank.create 0.0 time) ], s, Time.epoch)
     (* Put flow A into leaf 0, flow B into leaf 1, and flow C into leaf 2.
        The ranks at the root are straightforward: nothing fancy to do with
        the float portion proper, but we do register the time of the packet's
@@ -50,7 +50,7 @@ module FCFS_Ternary : Alg_t = struct
   let control : Control.t =
     {
       s = State.create 1;
-      q = Pifotree.create topology;
+      q = Pieotree.create topology;
       z = scheduling_transaction;
     }
 
@@ -71,14 +71,14 @@ module Strict_Ternary : Alg_t = struct
       | "C" -> (2, Rank.create 0.0 time)
       | n -> failwith Printf.(sprintf "Don't know how to route flow %s." n)
     in
-    ([ (int_for_root, rank_for_root); (0, Rank.create 0.0 time) ], s)
+    ([ (int_for_root, rank_for_root); (0, Rank.create 0.0 time) ], s, Time.epoch)
 
   let topology = Topo.one_level_ternary
 
   let control : Control.t =
     {
       s = State.create 1;
-      q = Pifotree.create topology;
+      q = Pieotree.create topology;
       z = scheduling_transaction;
     }
 
@@ -110,14 +110,14 @@ module RRobin_Ternary : Alg_t = struct
       | n -> failwith Printf.(sprintf "Don't know how to route flow %s." n)
     in
     (* The ranks are as calculated above. *)
-    ([ (int_for_root, rank_for_root); (0, Rank.create 0.0 time) ], s')
+    ([ (int_for_root, rank_for_root); (0, Rank.create 0.0 time) ], s', Time.epoch)
 
   let topology = Topo.one_level_ternary
 
   let control : Control.t =
     {
       s = State.create 3;
-      q = Pifotree.create topology;
+      q = Pieotree.create topology;
       z = scheduling_transaction;
     }
 
@@ -155,7 +155,7 @@ module WFQ_Ternary : Alg_t = struct
       | "C" -> 2
       | n -> failwith Printf.(sprintf "Don't know how to route flow %s." n)
     in
-    ([ (int_for_root, rank_for_root); (0, Rank.create 0.0 time) ], s')
+    ([ (int_for_root, rank_for_root); (0, Rank.create 0.0 time) ], s', Time.epoch)
 
   let topology = Topo.one_level_ternary
 
@@ -166,7 +166,7 @@ module WFQ_Ternary : Alg_t = struct
     |> State.rebind "C_weight" 0.3
 
   let control : Control.t =
-    { s = init_state; q = Pifotree.create topology; z = scheduling_transaction }
+    { s = init_state; q = Pieotree.create topology; z = scheduling_transaction }
 
   let simulate sim_length pkts =
     Control.simulate sim_length 0.001 poprate pkts control
@@ -197,7 +197,8 @@ module HPFQ_Binary : Alg_t = struct
             (0, rank_for_left_node);
             (0, Rank.create 0.0 time);
           ],
-          s'' )
+          s'', 
+          Time.epoch )
     | "B" ->
         let rank_for_root, s' =
           wfq_helper s
@@ -214,14 +215,15 @@ module HPFQ_Binary : Alg_t = struct
             (1, rank_for_left_node);
             (0, Rank.create 0.0 time);
           ],
-          s'' )
+          s'',
+          Time.epoch )
     | "C" ->
         let rank_for_root, s' =
           wfq_helper s
             (State.lookup "C_weight" s)
             "C_last_finish" (Packet.len pkt) time
         in
-        ([ (1, rank_for_root); (0, Rank.create 0.0 time) ], s')
+        ([ (1, rank_for_root); (0, Rank.create 0.0 time) ], s', Time.epoch)
     | n -> failwith Printf.(sprintf "Don't know how to route flow %s." n)
 
   let topology = Topo.two_level_binary
@@ -234,7 +236,7 @@ module HPFQ_Binary : Alg_t = struct
         |> State.rebind "A_weight" 0.75
         |> State.rebind "B_weight" 0.25
         |> State.rebind "C_weight" 0.2;
-      q = Pifotree.create topology;
+      q = Pieotree.create topology;
       z = scheduling_transaction;
     }
 
@@ -257,14 +259,14 @@ module TwoPol_Ternary : Alg_t = struct
             (State.lookup "A_weight" s)
             "A_last_finish" (Packet.len pkt) time
         in
-        ([ (0, rank_for_root); (0, Rank.create 0.0 time) ], s')
+        ([ (0, rank_for_root); (0, Rank.create 0.0 time) ], s', Time.epoch)
     | "B" ->
         let rank_for_root, s' =
           wfq_helper s
             (State.lookup "B_weight" s)
             "B_last_finish" (Packet.len pkt) time
         in
-        ([ (1, rank_for_root); (0, Rank.create 0.0 time) ], s')
+        ([ (1, rank_for_root); (0, Rank.create 0.0 time) ], s', Time.epoch)
     | "C" | "D" | "E" ->
         let rank_for_root, s' =
           wfq_helper s
@@ -287,7 +289,8 @@ module TwoPol_Ternary : Alg_t = struct
             (int_for_right, Rank.create rank_for_right time);
             (0, Rank.create 0.0 time);
           ],
-          s' )
+          s', 
+          Time.epoch )
     | n -> failwith Printf.(sprintf "Don't know how to route flow %s." n)
 
   let topology = Topo.two_level_ternary
@@ -299,7 +302,7 @@ module TwoPol_Ternary : Alg_t = struct
         |> State.rebind "A_weight" 0.1
         |> State.rebind "B_weight" 0.1
         |> State.rebind "CDE_weight" 0.8;
-      q = Pifotree.create topology;
+      q = Pieotree.create topology;
       z = scheduling_transaction;
     }
 
@@ -323,14 +326,14 @@ module ThreePol_Ternary : Alg_t = struct
             (State.lookup "A_weight" s)
             "A_last_finish" (Packet.len pkt) time
         in
-        ([ (0, rank_for_root); (0, Rank.create 0.0 time) ], s')
+        ([ (0, rank_for_root); (0, Rank.create 0.0 time) ], s', Time.epoch)
     | "B" ->
         let rank_for_root, s' =
           wfq_helper s
             (State.lookup "B_weight" s)
             "B_last_finish" (Packet.len pkt) time
         in
-        ([ (1, rank_for_root); (0, Rank.create 0.0 time) ], s')
+        ([ (1, rank_for_root); (0, Rank.create 0.0 time) ], s', Time.epoch)
     (* In addition to WFQ at the root,
        we must, at the right node, do round-robin between C, D, and EFG. *)
     | "C" ->
@@ -351,7 +354,8 @@ module ThreePol_Ternary : Alg_t = struct
           (Rank.create r time, new_state)
         in
         ( [ (2, rank_for_root); (0, rank_for_right); (0, Rank.create 0.0 time) ],
-          s'' )
+          s'',
+          Time.epoch )
     | "D" ->
         let rank_for_root, s' =
           wfq_helper s
@@ -370,7 +374,8 @@ module ThreePol_Ternary : Alg_t = struct
           (Rank.create r time, new_state)
         in
         ( [ (2, rank_for_root); (1, rank_for_right); (0, Rank.create 0.0 time) ],
-          s'' )
+          s'',
+          Time.epoch )
     | "E" | "F" | "G" ->
         (* In addition to WFQ at the root and round-robin at the right node,
            we must do WFQ between E, F, and G at the right node's right node. *)
@@ -409,7 +414,8 @@ module ThreePol_Ternary : Alg_t = struct
             (int_for_right_right, rank_for_right_right);
             (0, Rank.create 0.0 time);
           ],
-          s''' )
+          s''',
+          Time.epoch )
     | n -> failwith Printf.(sprintf "Don't know how to route flow %s." n)
 
   let topology = Topo.three_level_ternary
@@ -424,7 +430,7 @@ module ThreePol_Ternary : Alg_t = struct
         |> State.rebind "E_weight" 0.1
         |> State.rebind "F_weight" 0.4
         |> State.rebind "G_weight" 0.5;
-      q = Pifotree.create topology;
+      q = Pieotree.create topology;
       z = scheduling_transaction;
     }
 
@@ -462,11 +468,11 @@ module Alg2B (Alg : Alg_t) : Alg_t = struct
   let f_tilde = Topo.lift_tilde f
 
   let z' s pkt =
-    let pt, s' = Alg.control.z s pkt in
-    (f_tilde Alg.topology pt, s')
+    let pt, s', ts = Alg.control.z s pkt in
+    (f_tilde Alg.topology pt, s', ts)
 
   let control : Control.t =
-    { s = Alg.control.s; q = Pifotree.create topology; z = z' }
+    { s = Alg.control.s; q = Pieotree.create topology; z = z' }
 
   let simulate sim_length pkts =
     Control.simulate sim_length 0.001 poprate pkts control
@@ -491,10 +497,10 @@ module Extension_Flat : Alg_t = struct
   let scheduling_transaction (s : State.t) pkt =
     let time = Packet.time pkt in
     match find_flow pkt with
-    | "A" -> ([ (0, Rank.create 0.0 time); (0, Rank.create 0.0 time) ], s)
-    | "B" -> ([ (1, Rank.create 0.0 time); (0, Rank.create 0.0 time) ], s)
-    | "C" -> ([ (2, Rank.create 0.0 time); (0, Rank.create 0.0 time) ], s)
-    | "D" -> ([ (3, Rank.create 0.0 time); (0, Rank.create 0.0 time) ], s) (* new *)
+    | "A" -> ([ (0, Rank.create 0.0 time); (0, Rank.create 0.0 time) ], s, Time.epoch)
+    | "B" -> ([ (1, Rank.create 0.0 time); (0, Rank.create 0.0 time) ], s, Time.epoch)
+    | "C" -> ([ (2, Rank.create 0.0 time); (0, Rank.create 0.0 time) ], s, Time.epoch)
+    | "D" -> ([ (3, Rank.create 0.0 time); (0, Rank.create 0.0 time) ], s, Time.epoch) (* new *)
     | n -> failwith Printf.(sprintf "Don't know how to route flow %s." n)
 
   let topology = Topo.flat_four (* changed *)
@@ -502,7 +508,7 @@ module Extension_Flat : Alg_t = struct
   let control : Control.t =
     {
       s = State.create 1;
-      q = Pifotree.create topology;
+      q = Pieotree.create topology;
       z = scheduling_transaction;
     }
 
@@ -523,11 +529,11 @@ module Alg2T (Alg : Alg_t) : Alg_t = struct
   let f_tilde = Topo.lift_tilde f
 
   let z' s pkt =
-    let pt, s' = Alg.control.z s pkt in
-    (f_tilde Alg.topology pt, s')
+    let pt, s', ts = Alg.control.z s pkt in
+    (f_tilde Alg.topology pt, s', ts)
 
   let control : Control.t =
-    { s = Alg.control.s; q = Pifotree.create topology; z = z' }
+    { s = Alg.control.s; q = Pieotree.create topology; z = z' }
 
   let simulate sim_length pkts =
     Control.simulate sim_length 0.001 poprate pkts control
