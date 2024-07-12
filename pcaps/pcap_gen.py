@@ -1,4 +1,5 @@
-from scapy.all import Ether, IP, wrpcap
+from scapy.all import Ether, IP, UDP, Raw, wrpcap
+import random
 
 a = "10:10:10:10:10:10"
 b = "20:20:20:20:20:20"
@@ -70,15 +71,27 @@ def seven_flows():
         p.time = i / 10
     return packets
 
+def four_flows_diff_size():
+    packets = []
+    srcs = [a, b, c, d] * 12 + [a, b]
+    for src in srcs:
+        data = "F"*random.randint(25,50)
+        packets += Ether(src=src, dst=dummy) / IP(src="1.1.1.1", dst="1.1.1.1") / UDP(sport=123,dport=456) / Raw(data)
+    for i, p in enumerate(packets):
+        p.time = i / 10
+    return packets
+
 
 def generate_pcaps():
-    wrpcap("./pcaps/three_flows.pcap", three_flows())
-    wrpcap("./pcaps/three_flows_bursty.pcap", three_flows_bursty())
+    # wrpcap("./pcaps/three_flows.pcap", three_flows())
+    # wrpcap("./pcaps/three_flows_bursty.pcap", three_flows_bursty())
     wrpcap("./pcaps/two_then_three.pcap", two_then_three())
     wrpcap("./pcaps/four_flows.pcap", four_flows())
     wrpcap("./pcaps/five_flows.pcap", five_flows())
     wrpcap("./pcaps/seven_flows.pcap", seven_flows())
+    wrpcap("./pcaps/four_flows_diff_size.pcap", four_flows_diff_size())
 
 
 if __name__ == "__main__":
+    random.seed(5)
     generate_pcaps()
