@@ -546,7 +546,7 @@ module Extension_Ternary = Alg2T (Extension_Flat)
 (*************)
 
 module Shifted_FCFS_Ternary : Alg_t = struct
-  (* FCFS, but every packet is allowed to be popped after 5 seconds from arrival. *)
+  (* FCFS but every packet is allowed to be popped 5 seconds after arrival. *)
   let scheduling_transaction (s : State.t) pkt =
     let time = Packet.time pkt in
     let shift = Time.add_float time 5.0 in
@@ -572,7 +572,7 @@ end
 module Shifted_FCFS_Ternary_Bin = Alg2B (Shifted_FCFS_Ternary)
 
 module Rate_Limit_WFQ_Quaternary : Alg_t = struct
-  (* WFQ, but every flow C is rate limited to 78 bytes/s. *)
+  (* WFQ but flow C is rate limited to 78 bytes/s. *)
   let scheduling_transaction s pkt =
     let time = Packet.time pkt in
     let flow = find_flow pkt in
