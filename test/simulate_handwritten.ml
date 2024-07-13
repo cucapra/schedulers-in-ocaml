@@ -10,7 +10,8 @@ let simulate_handwritten () =
   run WFQ_Ternary.simulate wfq_flow "wfq";
   run HPFQ_Binary.simulate two_then_three "hpfq";
   run TwoPol_Ternary.simulate five_flows "twopol";
-  run ThreePol_Ternary.simulate seven_flows "threepol"
+  run ThreePol_Ternary.simulate seven_flows "threepol";
+  run Rate_Limit_WFQ_Quaternary.simulate four_flows_diff_size "rate_limit_wfq"
 
 
 let _ = simulate_handwritten ()

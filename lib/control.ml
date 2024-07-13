@@ -35,11 +35,12 @@ let simulate sim_length sleep pop_tick flow t =
           "Warning: not every packet was pushed at the time simulation ended. \
            The flow has %d packet(s).\n"
           (List.length flow);
-      if Pieotree.size tree time > 0 then
+      let size = Pieotree.size tree Time.end_times in
+      if size > 0 then
         Printf.printf
           "Warning: not every packet was popped at the time simulation ended. \
            The tree has %d packet(s).\n"
-          (Pieotree.size tree time);
+           size;
       List.rev ans)
     else if tsp >= pop_tick then
       if Pieotree.size tree time = 0 then

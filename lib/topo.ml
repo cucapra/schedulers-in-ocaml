@@ -243,6 +243,7 @@ let rec lift_tilde (f : map_t) tree (path : Path.t) =
   | _ -> failwith "Topology and path do not match."
 
 (* A few topologies to play with. *)
+let one_level_quaternary = Node [Star; Star; Star; Star]
 let one_level_ternary = Node [ Star; Star; Star ]
 let one_level_binary = Node [ Star; Star ]
 let two_level_binary = Node [ Node [ Star; Star ]; Star ]

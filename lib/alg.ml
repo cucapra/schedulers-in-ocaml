@@ -546,9 +546,10 @@ module Extension_Ternary = Alg2T (Extension_Flat)
 (*************)
 
 module Shifted_FCFS_Ternary : Alg_t = struct
+  (* FCFS, but every packet is allowed to be popped after 5 seconds from arrival. *)
   let scheduling_transaction (s : State.t) pkt =
     let time = Packet.time pkt in
-    let shift = Time.(to_float time +. 5.0 |> of_float) in
+    let shift = Time.add_float time 5.0 in
     match find_flow pkt with
     | "A" -> ([ (0, Rank.create 0.0 time); (0, Rank.create 0.0 time) ], s, shift)
     | "B" -> ([ (1, Rank.create 0.0 time); (0, Rank.create 0.0 time) ], s, shift)
@@ -569,3 +570,55 @@ module Shifted_FCFS_Ternary : Alg_t = struct
 end
 
 module Shifted_FCFS_Ternary_Bin = Alg2B (Shifted_FCFS_Ternary)
+
+module Rate_Limit_WFQ_Quaternary : Alg_t = struct
+  (* WFQ, but every flow C is rate limited to 78 bytes/s. *)
+  let scheduling_transaction s pkt =
+    let time = Packet.time pkt in
+    let flow = find_flow pkt in
+    let var_last_finish = Printf.sprintf "%s_last_finish" flow in
+    let var_weight = Printf.sprintf "%s_weight" flow in
+    let weight = State.lookup var_weight s in
+    let rank_for_root, s' =
+      wfq_helper s weight var_last_finish (Packet.len pkt) time
+    in
+    let ts, s'' = 
+      if flow <> "C" then 
+        Time.epoch, s'
+      else
+        let c_ts = State.lookup "C_next_ts" s' in
+        let throttle = State.lookup "C_throttle" s' in
+        Time.of_float c_ts, 
+        State.rebind "C_next_ts" (Float.ceil (Packet.len pkt /. throttle) +. c_ts) s'
+    in 
+    let int_for_root =
+      match flow with
+      | "A" -> 0
+      | "B" -> 1
+      | "C" -> 2
+      | "D" -> 3
+      | n -> failwith Printf.(sprintf "Don't know how to route flow %s." n)
+    in
+    ([ (int_for_root, rank_for_root); (0, Rank.create 0.0 time) ], s'', ts)
+
+  let topology = Topo.one_level_quaternary
+
+  let init_state =
+    State.create 6
+    |> State.rebind "A_weight" 0.1
+    |> State.rebind "B_weight" 0.2
+    |> State.rebind "C_weight" 0.3
+    |> State.rebind "D_weight" 0.4
+    |> State.rebind "C_next_ts" 0.0
+    |> State.rebind "C_throttle" 78.0
+
+  let control : Control.t =
+    { s = init_state; q = Pieotree.create topology; z = scheduling_transaction }
+
+  let simulate sim_length pkts =
+    Control.simulate sim_length 0.001 poprate pkts control
+end
+
+module Rate_Limit_WFQ_Quaternary_Bin = Alg2B (Rate_Limit_WFQ_Quaternary)
+
+module Rate_Limit_WFQ_Quaternary_Ternary = Alg2T (Rate_Limit_WFQ_Quaternary)

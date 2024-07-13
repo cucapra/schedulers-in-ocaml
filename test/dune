@@ -5,5 +5,6 @@
   simulate_binary
   embed_extension
   simulate_extension_handwritten
-  simulate_extension_ternary)
+  simulate_extension_ternary
+  simulate_ternary)
  (libraries pifotrees_lib))
