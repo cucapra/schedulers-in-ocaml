@@ -7,3 +7,4 @@ val time : t -> Time.t
 val src : t -> int
 val len : t -> float
 val write_to_csv : t list -> Time.t -> string -> unit
+val find_flow : t -> Flow.t

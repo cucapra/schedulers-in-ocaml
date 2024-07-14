@@ -1,21 +1,5 @@
 let poprate = 0.25 (* Four packets per second. *)
 
-let find_flow p =
-  (* In pcap_gen.py, we create packets with sources based on their MAC addresses.
-     After going through our parser, those packets' sources get converted into
-     inscrutable integers.
-     This little function converts those integers back into human-readable strings.
-  *)
-  match Packet.src p with
-  | 17661175009296 -> "A" (* Used to be address 10:10:10:10:10:10. *)
-  | 35322350018592 -> "B" (* 20...*)
-  | 52983525027888 -> "C" (* 30...*)
-  | 70644700037184 -> "D" (* 40...*)
-  | 88305875046480 -> "E" (* 50...*)
-  | 105967050055776 -> "F" (* 60...*)
-  | 123628225065072 -> "G" (* 70...*)
-  | n -> failwith Printf.(sprintf "Unknown source address: %d." n)
-
 module type Alg_t = sig
   val topology : Topo.t
   val control : Control.t
@@ -25,10 +9,10 @@ end
 module FCFS_Ternary : Alg_t = struct
   let scheduling_transaction (s : State.t) pkt =
     let time = Packet.time pkt in
-    match find_flow pkt with
-    | "A" -> ([ (0, Rank.create 0.0 time); (0, Rank.create 0.0 time) ], s, Time.epoch)
-    | "B" -> ([ (1, Rank.create 0.0 time); (0, Rank.create 0.0 time) ], s, Time.epoch)
-    | "C" -> ([ (2, Rank.create 0.0 time); (0, Rank.create 0.0 time) ], s, Time.epoch)
+    match Packet.find_flow pkt with
+    | A -> ([ (0, Rank.create 0.0 time); (0, Rank.create 0.0 time) ], s, Time.epoch)
+    | B -> ([ (1, Rank.create 0.0 time); (0, Rank.create 0.0 time) ], s, Time.epoch)
+    | C -> ([ (2, Rank.create 0.0 time); (0, Rank.create 0.0 time) ], s, Time.epoch)
     (* Put flow A into leaf 0, flow B into leaf 1, and flow C into leaf 2.
        The ranks at the root are straightforward: nothing fancy to do with
        the float portion proper, but we do register the time of the packet's
@@ -43,7 +27,7 @@ module FCFS_Ternary : Alg_t = struct
                                               ^^^
                                             ignored
     *)
-    | n -> failwith Printf.(sprintf "Don't know how to route flow %s." n)
+    | n -> failwith Printf.(sprintf "Don't know how to route flow %s." (Flow.to_string n))
 
   let topology = Topo.one_level_ternary
 
@@ -65,11 +49,11 @@ module Strict_Ternary : Alg_t = struct
       (* Put flow A into leaf 0, flow B into leaf 1, and flow C into leaf 2.
          The ranks at the root are set up to prefer C to B, and B to A.
       *)
-      match find_flow pkt with
-      | "A" -> (0, Rank.create 2.0 time)
-      | "B" -> (1, Rank.create 1.0 time)
-      | "C" -> (2, Rank.create 0.0 time)
-      | n -> failwith Printf.(sprintf "Don't know how to route flow %s." n)
+      match Packet.find_flow pkt with
+      | A -> (0, Rank.create 2.0 time)
+      | B-> (1, Rank.create 1.0 time)
+      | C -> (2, Rank.create 0.0 time)
+      | n -> failwith Printf.(sprintf "Don't know how to route flow %s." (Flow.to_string n))
     in
     ([ (int_for_root, rank_for_root); (0, Rank.create 0.0 time) ], s, Time.epoch)
 
@@ -89,8 +73,8 @@ end
 module RRobin_Ternary : Alg_t = struct
   let scheduling_transaction s pkt =
     let time = Packet.time pkt in
-    let flow = find_flow pkt in
-    let var_last_finish = Printf.sprintf "%s_last_finish" flow in
+    let flow = Packet.find_flow pkt in
+    let var_last_finish = Printf.sprintf "%s_last_finish" (Flow.to_string flow) in
     (* We will use this variable to read/write to state. *)
     let rank_for_root =
       if State.isdefined var_last_finish s then
@@ -104,10 +88,10 @@ module RRobin_Ternary : Alg_t = struct
     let int_for_root =
       (* Put flow A into leaf 0, flow B into leaf 1, and flow C into leaf 2. *)
       match flow with
-      | "A" -> 0
-      | "B" -> 1
-      | "C" -> 2
-      | n -> failwith Printf.(sprintf "Don't know how to route flow %s." n)
+      | A -> 0
+      | B -> 1
+      | C -> 2
+      | n -> failwith Printf.(sprintf "Don't know how to route flow %s." (Flow.to_string n))
     in
     (* The ranks are as calculated above. *)
     ([ (int_for_root, rank_for_root); (0, Rank.create 0.0 time) ], s', Time.epoch)
@@ -140,9 +124,9 @@ let wfq_helper s weight var_last_finish pkt_len time : Rank.t * State.t =
 module WFQ_Ternary : Alg_t = struct
   let scheduling_transaction s pkt =
     let time = Packet.time pkt in
-    let flow = find_flow pkt in
-    let var_last_finish = Printf.sprintf "%s_last_finish" flow in
-    let var_weight = Printf.sprintf "%s_weight" flow in
+    let flow = Packet.find_flow pkt in
+    let var_last_finish = Printf.sprintf "%s_last_finish" (Flow.to_string flow) in
+    let var_weight = Printf.sprintf "%s_weight" (Flow.to_string flow) in
     let weight = State.lookup var_weight s in
     let rank_for_root, s' =
       wfq_helper s weight var_last_finish (Packet.len pkt) time
@@ -150,10 +134,10 @@ module WFQ_Ternary : Alg_t = struct
     let int_for_root =
       (* Put flow A into leaf 0, flow B into leaf 1, and flow C into leaf 2. *)
       match flow with
-      | "A" -> 0
-      | "B" -> 1
-      | "C" -> 2
-      | n -> failwith Printf.(sprintf "Don't know how to route flow %s." n)
+      | A -> 0
+      | B -> 1
+      | C -> 2
+      | n -> failwith Printf.(sprintf "Don't know how to route flow %s." (Flow.to_string n))
     in
     ([ (int_for_root, rank_for_root); (0, Rank.create 0.0 time) ], s', Time.epoch)
 
@@ -175,13 +159,13 @@ end
 module HPFQ_Binary : Alg_t = struct
   let scheduling_transaction s pkt =
     let time = Packet.time pkt in
-    let flow = find_flow pkt in
+    let flow = Packet.find_flow pkt in
     (* This is either A, B, or C.
        When computing ranks for the root, we arbitrate between AB or C.
        When computing ranks for the left node, we arbitrate between A or B.
     *)
     match flow with
-    | "A" ->
+    | A ->
         let rank_for_root, s' =
           wfq_helper s
             (State.lookup "AB_weight" s)
@@ -199,7 +183,7 @@ module HPFQ_Binary : Alg_t = struct
           ],
           s'', 
           Time.epoch )
-    | "B" ->
+    | B ->
         let rank_for_root, s' =
           wfq_helper s
             (State.lookup "AB_weight" s)
@@ -217,14 +201,14 @@ module HPFQ_Binary : Alg_t = struct
           ],
           s'',
           Time.epoch )
-    | "C" ->
+    | C ->
         let rank_for_root, s' =
           wfq_helper s
             (State.lookup "C_weight" s)
             "C_last_finish" (Packet.len pkt) time
         in
         ([ (1, rank_for_root); (0, Rank.create 0.0 time) ], s', Time.epoch)
-    | n -> failwith Printf.(sprintf "Don't know how to route flow %s." n)
+    | n -> failwith Printf.(sprintf "Don't know how to route flow %s." (Flow.to_string n))
 
   let topology = Topo.two_level_binary
 
@@ -247,27 +231,27 @@ end
 module TwoPol_Ternary : Alg_t = struct
   let scheduling_transaction s pkt =
     let time = Packet.time pkt in
-    let flow = find_flow pkt in
+    let flow = Packet.find_flow pkt in
     (* This is either A, B, C, D, or E.
        When computing ranks for the root, we arbitrate between A, B, or CDE.
        When computing ranks for the right node, we arbitrate between C, D, or E.
     *)
     match flow with
-    | "A" ->
+    | A ->
         let rank_for_root, s' =
           wfq_helper s
             (State.lookup "A_weight" s)
             "A_last_finish" (Packet.len pkt) time
         in
         ([ (0, rank_for_root); (0, Rank.create 0.0 time) ], s', Time.epoch)
-    | "B" ->
+    | B ->
         let rank_for_root, s' =
           wfq_helper s
             (State.lookup "B_weight" s)
             "B_last_finish" (Packet.len pkt) time
         in
         ([ (1, rank_for_root); (0, Rank.create 0.0 time) ], s', Time.epoch)
-    | "C" | "D" | "E" ->
+    | C | D | E ->
         let rank_for_root, s' =
           wfq_helper s
             (State.lookup "CDE_weight" s)
@@ -279,9 +263,9 @@ module TwoPol_Ternary : Alg_t = struct
              D to the 1st child, and E to the 2nd child.
              Futher, we want to prioritize E over D and D over C.
           *)
-          | "C" -> (0, 2.0)
-          | "D" -> (1, 1.0)
-          | "E" -> (2, 0.0)
+          | C -> (0, 2.0)
+          | D -> (1, 1.0)
+          | E -> (2, 0.0)
           | _ -> failwith "Impossible."
         in
         ( [
@@ -291,7 +275,7 @@ module TwoPol_Ternary : Alg_t = struct
           ],
           s', 
           Time.epoch )
-    | n -> failwith Printf.(sprintf "Don't know how to route flow %s." n)
+    | n -> failwith Printf.(sprintf "Don't know how to route flow %s." (Flow.to_string n))
 
   let topology = Topo.two_level_ternary
 
@@ -313,21 +297,21 @@ end
 module ThreePol_Ternary : Alg_t = struct
   let scheduling_transaction s pkt =
     let time = Packet.time pkt in
-    let flow = find_flow pkt in
+    let flow = Packet.find_flow pkt in
     (* This is either A, B, C, D, E, F, or G.
        When computing ranks for the root, we arbitrate between A, B, or CDEFG.
        When computing ranks for the right node, we arbitrate between C, D, or EFG.
        When computing ranks for the right node's right node, we arbitrate between E, F, or G.
     *)
     match flow with
-    | "A" ->
+    | A ->
         let rank_for_root, s' =
           wfq_helper s
             (State.lookup "A_weight" s)
             "A_last_finish" (Packet.len pkt) time
         in
         ([ (0, rank_for_root); (0, Rank.create 0.0 time) ], s', Time.epoch)
-    | "B" ->
+    | B ->
         let rank_for_root, s' =
           wfq_helper s
             (State.lookup "B_weight" s)
@@ -336,7 +320,7 @@ module ThreePol_Ternary : Alg_t = struct
         ([ (1, rank_for_root); (0, Rank.create 0.0 time) ], s', Time.epoch)
     (* In addition to WFQ at the root,
        we must, at the right node, do round-robin between C, D, and EFG. *)
-    | "C" ->
+    | C ->
         let rank_for_root, s' =
           wfq_helper s
             (State.lookup "CDEFG_weight" s)
@@ -356,7 +340,7 @@ module ThreePol_Ternary : Alg_t = struct
         ( [ (2, rank_for_root); (0, rank_for_right); (0, Rank.create 0.0 time) ],
           s'',
           Time.epoch )
-    | "D" ->
+    | D ->
         let rank_for_root, s' =
           wfq_helper s
             (State.lookup "CDEFG_weight" s)
@@ -376,7 +360,7 @@ module ThreePol_Ternary : Alg_t = struct
         ( [ (2, rank_for_root); (1, rank_for_right); (0, Rank.create 0.0 time) ],
           s'',
           Time.epoch )
-    | "E" | "F" | "G" ->
+    | E | F | G ->
         (* In addition to WFQ at the root and round-robin at the right node,
            we must do WFQ between E, F, and G at the right node's right node. *)
         let rank_for_root, s' =
@@ -397,15 +381,15 @@ module ThreePol_Ternary : Alg_t = struct
         in
         let rank_for_right_right, s''' =
           wfq_helper s''
-            (State.lookup (Printf.sprintf "%s_weight" flow) s'')
-            (Printf.sprintf "%s_last_finish" flow)
+            (State.lookup (Printf.sprintf "%s_weight" (Flow.to_string flow)) s'')
+            (Printf.sprintf "%s_last_finish" (Flow.to_string flow))
             (Packet.len pkt) time
         in
         let int_for_right_right =
           match flow with
-          | "E" -> 0
-          | "F" -> 1
-          | "G" -> 2
+          | E -> 0
+          | F -> 1
+          | G -> 2
           | _ -> failwith "Impossible."
         in
         ( [
@@ -416,7 +400,6 @@ module ThreePol_Ternary : Alg_t = struct
           ],
           s''',
           Time.epoch )
-    | n -> failwith Printf.(sprintf "Don't know how to route flow %s." n)
 
   let topology = Topo.three_level_ternary
 
@@ -465,11 +448,11 @@ module Alg2B (Alg : Alg_t) : Alg_t = struct
        where pt and s' are gotten by running z s pkt.
   *)
   let topology, f = Topo.build_binary Alg.topology
-  let f_tilde = Topo.lift_tilde f
+  let f_tilde = Topo.lift_tilde f Alg.topology
 
   let z' s pkt =
     let pt, s', ts = Alg.control.z s pkt in
-    (f_tilde Alg.topology pt, s', ts)
+    (f_tilde pt, s', ts)
 
   let control : Control.t =
     { s = Alg.control.s; q = Pieotree.create topology; z = z' }
@@ -496,12 +479,12 @@ module Extension_Flat : Alg_t = struct
   *)
   let scheduling_transaction (s : State.t) pkt =
     let time = Packet.time pkt in
-    match find_flow pkt with
-    | "A" -> ([ (0, Rank.create 0.0 time); (0, Rank.create 0.0 time) ], s, Time.epoch)
-    | "B" -> ([ (1, Rank.create 0.0 time); (0, Rank.create 0.0 time) ], s, Time.epoch)
-    | "C" -> ([ (2, Rank.create 0.0 time); (0, Rank.create 0.0 time) ], s, Time.epoch)
-    | "D" -> ([ (3, Rank.create 0.0 time); (0, Rank.create 0.0 time) ], s, Time.epoch) (* new *)
-    | n -> failwith Printf.(sprintf "Don't know how to route flow %s." n)
+    match Packet.find_flow pkt with
+    | A -> ([ (0, Rank.create 0.0 time); (0, Rank.create 0.0 time) ], s, Time.epoch)
+    | B -> ([ (1, Rank.create 0.0 time); (0, Rank.create 0.0 time) ], s, Time.epoch)
+    | C -> ([ (2, Rank.create 0.0 time); (0, Rank.create 0.0 time) ], s, Time.epoch)
+    | D -> ([ (3, Rank.create 0.0 time); (0, Rank.create 0.0 time) ], s, Time.epoch) (* new *)
+    | n -> failwith Printf.(sprintf "Don't know how to route flow %s." (Flow.to_string n))
 
   let topology = Topo.flat_four (* changed *)
 
@@ -526,11 +509,11 @@ module Alg2T (Alg : Alg_t) : Alg_t = struct
   (*                ^^^^^^^^^^^^^^^^^^
                      The only change!
   *)
-  let f_tilde = Topo.lift_tilde f
+  let f_tilde = Topo.lift_tilde f Alg.topology
 
   let z' s pkt =
     let pt, s', ts = Alg.control.z s pkt in
-    (f_tilde Alg.topology pt, s', ts)
+    (f_tilde pt, s', ts)
 
   let control : Control.t =
     { s = Alg.control.s; q = Pieotree.create topology; z = z' }
@@ -550,11 +533,11 @@ module Shifted_FCFS_Ternary : Alg_t = struct
   let scheduling_transaction (s : State.t) pkt =
     let time = Packet.time pkt in
     let shift = Time.add_float time 5.0 in
-    match find_flow pkt with
-    | "A" -> ([ (0, Rank.create 0.0 time); (0, Rank.create 0.0 time) ], s, shift)
-    | "B" -> ([ (1, Rank.create 0.0 time); (0, Rank.create 0.0 time) ], s, shift)
-    | "C" -> ([ (2, Rank.create 0.0 time); (0, Rank.create 0.0 time) ], s, shift)
-    | n -> failwith Printf.(sprintf "Don't know how to route flow %s." n)
+    match Packet.find_flow pkt with
+    | A -> ([ (0, Rank.create 0.0 time); (0, Rank.create 0.0 time) ], s, shift)
+    | B -> ([ (1, Rank.create 0.0 time); (0, Rank.create 0.0 time) ], s, shift)
+    | C -> ([ (2, Rank.create 0.0 time); (0, Rank.create 0.0 time) ], s, shift)
+    | n -> failwith Printf.(sprintf "Don't know how to route flow %s." (Flow.to_string n))
 
   let topology = Topo.one_level_ternary
 
@@ -569,21 +552,19 @@ module Shifted_FCFS_Ternary : Alg_t = struct
     Control.simulate sim_length 0.001 poprate pkts control
 end
 
-module Shifted_FCFS_Ternary_Bin = Alg2B (Shifted_FCFS_Ternary)
-
 module Rate_Limit_WFQ_Quaternary : Alg_t = struct
   (* WFQ but flow C is rate limited to 78 bytes/s. *)
   let scheduling_transaction s pkt =
     let time = Packet.time pkt in
-    let flow = find_flow pkt in
-    let var_last_finish = Printf.sprintf "%s_last_finish" flow in
-    let var_weight = Printf.sprintf "%s_weight" flow in
+    let flow = Packet.find_flow pkt in
+    let var_last_finish = Printf.sprintf "%s_last_finish" (Flow.to_string flow) in
+    let var_weight = Printf.sprintf "%s_weight" (Flow.to_string flow) in
     let weight = State.lookup var_weight s in
     let rank_for_root, s' =
       wfq_helper s weight var_last_finish (Packet.len pkt) time
     in
     let ts, s'' = 
-      if flow <> "C" then 
+      if flow <> C then 
         Time.epoch, s'
       else
         let c_ts = State.lookup "C_next_ts" s' in
@@ -593,11 +574,11 @@ module Rate_Limit_WFQ_Quaternary : Alg_t = struct
     in 
     let int_for_root =
       match flow with
-      | "A" -> 0
-      | "B" -> 1
-      | "C" -> 2
-      | "D" -> 3
-      | n -> failwith Printf.(sprintf "Don't know how to route flow %s." n)
+      | A -> 0
+      | B -> 1
+      | C -> 2
+      | D -> 3
+      | n -> failwith Printf.(sprintf "Don't know how to route flow %s." (Flow.to_string n))
     in
     ([ (int_for_root, rank_for_root); (0, Rank.create 0.0 time) ], s'', ts)
 
@@ -619,6 +600,6 @@ module Rate_Limit_WFQ_Quaternary : Alg_t = struct
     Control.simulate sim_length 0.001 poprate pkts control
 end
 
+module Shifted_FCFS_Ternary_Bin = Alg2B (Shifted_FCFS_Ternary) 
 module Rate_Limit_WFQ_Quaternary_Bin = Alg2B (Rate_Limit_WFQ_Quaternary)
-
 module Rate_Limit_WFQ_Quaternary_Ternary = Alg2T (Rate_Limit_WFQ_Quaternary)

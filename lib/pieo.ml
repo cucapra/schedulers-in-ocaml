@@ -40,7 +40,11 @@ let flush t =
 
 let pop_pred t f = 
   (* Pop the least element in the PIFO that satisfies f. *)
-  let* v = Fheap.find t.heap ~f in
+  let* v = 
+    Fheap.to_list t.heap 
+    |> List.sort t.cmp
+    |> List.find_opt f 
+  in
   let init = Fheap.create ~compare:t.cmp in
   let f acc x = if x = v then acc else Fheap.add acc x in
   Some (v, (Fheap.fold t.heap ~init ~f) |> wrap t.cmp)
