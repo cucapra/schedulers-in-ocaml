@@ -26,7 +26,7 @@ let rec push t ts pkt path =
   | _ -> failwith "Push: invalid path"
 
 let rec size t now =
-  (* The size of a PIFO tree is the number of ready packets in its leaves. 
+  (* The size of a PIEO tree is the number of ready packets in its leaves. 
      Recall that a packet or reference is _ready_ if its time stamp is <= [now]. 
   *)
   match t with
@@ -43,7 +43,7 @@ let rec well_formed t now =
   let pieo_count_occ p ele = 
     Pieo.count p (fun (v, _, ts) -> v = ele && ts <= now) 
   in
-  (* Counts how many times ele occurs as a value in PIFO p. *)
+  (* Counts how many times ele occurs as a value in PIEO p. *)
   match t with
   | Leaf _ -> true
   | Internal (qs, p) ->

@@ -22,11 +22,11 @@ let of_list l cmp = wrap cmp (Fheap.of_list l ~compare:cmp)
 let count t f = Fheap.count t.heap ~f
 
 let filter t f = 
-  (* Filter out elements in the PIFO that fail to satisfy f. *)
+  (* Filter out elements in the PIEO that fail to satisfy f. *)
   Fheap.to_list t.heap |> List.filter f |> fun x -> of_list x t.cmp
 
 let flush t =
-  (* Pop the PIFO repeatedly until it is empty.
+  (* Pop the PIEO repeatedly until it is empty.
      Return a list of its elements in the order they were popped. 
   *)
   let rec helper acc =
@@ -39,7 +39,7 @@ let flush t =
   helper []
 
 let pop_pred t f = 
-  (* Pop the least element in the PIFO that satisfies f. *)
+  (* Pop the least element in the PIEO that satisfies f. *)
   let* v = 
     Fheap.to_list t.heap 
     |> List.sort t.cmp
