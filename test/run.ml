@@ -6,11 +6,12 @@ let rr_flow = Packet.pkts_from_file "../pcaps/rr_generated.pcap"
 let wfq_flow = Packet.pkts_from_file "../pcaps/wfq_generated.pcap"
 let two_then_three = Packet.pkts_from_file "../pcaps/two_then_three.pcap"
 let four_flows = Packet.pkts_from_file "../pcaps/four_flows.pcap"
+let four_flows_diff_size = Packet.pkts_from_file "../pcaps/four_flows_diff_size.pcap"
 let five_flows = Packet.pkts_from_file "../pcaps/five_flows.pcap"
 let seven_flows = Packet.pkts_from_file "../pcaps/seven_flows.pcap"
 
 let run simulate_fn flow name =
-  let sim_length = 20.0 in
+  let sim_length = 30.0 in
   (* Duration of time after which to cut off simulation. *)
   let popped_pkts = simulate_fn sim_length flow in
   (* Run the simulation; store the results. *)

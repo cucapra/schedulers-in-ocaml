@@ -153,3 +153,20 @@ let write_to_csv ts overdue filename =
   let payload = format_to_csv ts overdue in
   let ecsv = Csv.input_all (Csv.of_string payload) in
   Csv.save filename ecsv
+
+let find_flow t =
+  (* In pcap_gen.py, we create packets with sources based on their MAC addresses.
+     After going through our parser, those packets' sources get converted into
+     inscrutable integers.
+     This little function converts those integers back into human-readable strings.
+  *)
+  let open Flow in
+  match src t with
+  | 17661175009296 -> A (* Used to be address 10:10:10:10:10:10. *)
+  | 35322350018592 -> B (* 20...*)
+  | 52983525027888 -> C (* 30...*)
+  | 70644700037184 -> D (* 40...*)
+  | 88305875046480 -> E (* 50...*)
+  | 105967050055776 -> F (* 60...*)
+  | 123628225065072 -> G (* 70...*)
+  | n -> failwith Printf.(sprintf "Unknown source address: %d." n)

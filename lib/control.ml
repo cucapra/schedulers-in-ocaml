@@ -1,5 +1,5 @@
-type sched_t = State.t -> Packet.t -> Path.t * State.t
-type t = { s : State.t; q : Pifotree.t; z : sched_t }
+type sched_t = State.t -> Packet.t -> Path.t * State.t * Time.t
+type t = { s : State.t; q : Pieotree.t; z : sched_t }
 
 let simulate sim_length sleep pop_tick flow t =
   (* The user gives us:
@@ -35,20 +35,21 @@ let simulate sim_length sleep pop_tick flow t =
           "Warning: not every packet was pushed at the time simulation ended. \
            The flow has %d packet(s).\n"
           (List.length flow);
-      if Pifotree.size tree > 0 then
+      let size = Pieotree.size tree Time.end_times in
+      if size > 0 then
         Printf.printf
           "Warning: not every packet was popped at the time simulation ended. \
            The tree has %d packet(s).\n"
-          (Pifotree.size tree);
+           size;
       List.rev ans)
     else if tsp >= pop_tick then
-      if Pifotree.size tree = 0 then
+      if Pieotree.size tree time = 0 then
         (* The simulator was ready to pop, but there were no packets in the tree.
            Recurse with tsp = 0.0.
         *)
         helper flow time 0.0 state tree ans
       else
-        match Pifotree.pop tree with
+        match Pieotree.pop tree time with
         | None -> failwith "The tree was nonempty, but pop returned None."
         | Some (pkt, tree') ->
             (* Made progress by popping. Add to answer and recurse. *)
@@ -64,8 +65,8 @@ let simulate sim_length sleep pop_tick flow t =
           (* But is it ready to be scheduled? *)
           if time >= Packet.time pkt then
             (* Yes. Push it. *)
-            let path, state' = t.z state pkt in
-            let tree' = Pifotree.push tree (Packet.punch_in pkt time) path in
+            let path, state', ts = t.z state pkt in
+            let tree' = Pieotree.push tree ts (Packet.punch_in pkt time) path in
             (* Recurse with tsp = 0.0. *)
             helper flow' time tsp state' tree' ans
           else

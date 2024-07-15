@@ -54,14 +54,14 @@ let pop_d_topos pq d =
   let rec helper pq height acc d =
     if d = 0 then (List.rev acc, pq) (* We popped d items. Success. *)
     else
-      match Pifo.length pq with
+      match Pieo.length pq with
       | 0 ->
           (List.rev acc, pq)
           (* Before we could pop d items, we ran the PQ empty. Success. *)
       | _ -> (
           (* We have budget for more topologies, plus the PQ has topologies.
              We'll only take them if their height is correct, though. *)
-          match Pifo.pop_if pq (fun (_, _, _, height') -> height = height') with
+          match Pieo.pop_if pq (fun (_, _, _, height') -> height = height') with
           | None ->
               (* The next shortest topologies has height <> the target height.
                  What we have in the accumulator is the best we can do.
@@ -73,7 +73,7 @@ let pop_d_topos pq d =
               helper pq' height (topo :: acc) (d - 1))
   in
   (* Pop the top topology to prime the algorithm. *)
-  let ((_, _, _, m) as topo_one), pq' = Pifo.pop_exn pq in
+  let ((_, _, _, m) as topo_one), pq' = Pieo.pop_exn pq in
   (* Now we need up to d-1 more topologies, IF they have height m. *)
   let one, two = helper pq' m [ topo_one ] (d - 1) in
   (one, two, m)
@@ -84,13 +84,13 @@ let rec merge_into_one_topo pq d : t * map_t =
      subtree of a source tree onto the tree in question.
      This method merges the PQ's trees into one tree, as described in the paper.
   *)
-  match Pifo.length pq with
+  match Pieo.length pq with
   | 0 -> failwith "Cannot merge an empty PQ of topologies."
   | 1 ->
       (* Success: there was just one tree left.
          Discard the hint and the height and return the tree and its map.
       *)
-      let t, _, map, _ = Pifo.top_exn pq in
+      let t, _, map, _ = Pieo.top_exn pq in
       (t, map)
   | _ -> (
       (* Extract up to d trees with minimum height m. *)
@@ -100,7 +100,7 @@ let rec merge_into_one_topo pq d : t * map_t =
           (* There was just one tree with height m.
              Reinsert it with height m+1 and recurse.
           *)
-          let pq'' = Pifo.push pq' (topo, hint, map, m + 1) in
+          let pq'' = Pieo.push pq' (topo, hint, map, m + 1) in
           merge_into_one_topo pq'' d
       | _ ->
           (* There were two or more trees with height m.
@@ -156,7 +156,7 @@ let rec merge_into_one_topo pq d : t * map_t =
           (* The height of this tree is clearly one more than its children. *)
           let height = m + 1 in
           (* Add the new node to the priority queue. *)
-          let pq'' = Pifo.push pq' (node, hint, map, height) in
+          let pq'' = Pieo.push pq' (node, hint, map, height) in
           (* Recurse. *)
           merge_into_one_topo pq'' d)
 
@@ -183,7 +183,7 @@ let rec build_d_ary d = function
       (* A PIFO of these decorated subtrees, prioritized by height.
          Shorter is higher-priority.
       *)
-      let pq = Pifo.of_list ts' (fun (_, _, _, a) (_, _, _, b) -> a - b) in
+      let pq = Pieo.of_list ts' (fun (_, _, _, a) (_, _, _, b) -> a - b) in
       merge_into_one_topo pq d
 
 let build_binary = build_d_ary 2
@@ -243,6 +243,7 @@ let rec lift_tilde (f : map_t) tree (path : Path.t) =
   | _ -> failwith "Topology and path do not match."
 
 (* A few topologies to play with. *)
+let one_level_quaternary = Node [Star; Star; Star; Star]
 let one_level_ternary = Node [ Star; Star; Star ]
 let one_level_binary = Node [ Star; Star ]
 let two_level_binary = Node [ Node [ Star; Star ]; Star ]
