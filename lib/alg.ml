@@ -107,7 +107,7 @@ let rrobin n = (
 
     let z_out s pkt = 
       let turn = State.lookup "turn" s in
-      let turn' = ((int_of_float turn) + 1) mod n |> float_of_int in
+      let turn' = ((pkt_to_int pkt) + 1) mod n |> float_of_int in 
       let s' = State.rebind "turn" turn' s in
       let skipped = who_skip (pkt_to_int pkt) (int_of_float turn) in
       let f s i = 
