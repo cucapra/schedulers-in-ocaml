@@ -112,7 +112,7 @@ let rrobin n = (
       let skipped = who_skip (pkt_to_int pkt) (int_of_float turn) in
       let f s i = 
         let r_i = "r_" ^ (string_of_int i) in
-        State.rebind r_i (State.lookup r_i s +. (2.0 *. (float_of_int n))) s
+        State.rebind r_i (State.lookup r_i s +. (float_of_int n)) s
       in
       List.fold_left f s' skipped
 
