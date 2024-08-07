@@ -35,7 +35,8 @@ module FCFS_Ternary : Alg_t = struct
     {
       s = State.create 1;
       q = Pieotree.create topology;
-      z = scheduling_transaction;
+      z_in = scheduling_transaction;
+      z_out = fun s _ -> s;
     }
 
   let simulate sim_length pkts =
@@ -63,51 +64,95 @@ module Strict_Ternary : Alg_t = struct
     {
       s = State.create 1;
       q = Pieotree.create topology;
-      z = scheduling_transaction;
+      z_in = scheduling_transaction;
+      z_out = fun s _ -> s;
     }
 
   let simulate sim_length pkts =
     Control.simulate sim_length 0.001 poprate pkts control
 end
 
-module RRobin_Ternary : Alg_t = struct
-  let scheduling_transaction s pkt =
-    let time = Packet.time pkt in
-    let flow = Packet.find_flow pkt in
-    let var_last_finish = Printf.sprintf "%s_last_finish" (Flow.to_string flow) in
-    (* We will use this variable to read/write to state. *)
-    let rank_for_root =
-      if State.isdefined var_last_finish s then
-        max (Time.to_float time) (State.lookup var_last_finish s)
-      else Time.to_float time
-    in
-    let s' =
-      State.rebind var_last_finish (rank_for_root +. (100.0 /. 0.33)) s
-    in
-    let rank_for_root = Rank.create rank_for_root time in
-    let int_for_root =
-      (* Put flow A into leaf 0, flow B into leaf 1, and flow C into leaf 2. *)
-      match flow with
+let rrobin n = (
+  module struct
+    (* `n`-flow Round-Robin on an `n`-ary tree. *)
+    let _ = assert (n <= 7 && n > 0)
+
+    let who_skip pop turn = 
+      let rec who_skip_aux t acc = 
+        if t = pop then 
+          acc
+        else
+          who_skip_aux ((t + 1) mod n) (t :: acc)
+      in
+      who_skip_aux turn []
+
+    let pkt_to_int pkt =
+      match Packet.find_flow pkt with
       | A -> 0
       | B -> 1
-      | C -> 2
-      | n -> failwith Printf.(sprintf "Don't know how to route flow %s." (Flow.to_string n))
-    in
-    (* The ranks are as calculated above. *)
-    ([ (int_for_root, rank_for_root); (0, Rank.create 0.0 time) ], s', Time.epoch)
+      | C -> 2 
+      | D -> 3 
+      | E -> 4 
+      | F -> 5 
+      | G -> 6
 
-  let topology = Topo.one_level_ternary
+    let z_in s pkt = 
+      (* To push packet `p` from the `i`th flow,
+        1. we push `p` into our PIFO tree with path `(i, r_i) :: (v's arrival time)`
+        2. and increment `r_i += n`.
+      *)
+      let time = Packet.time pkt in
+      let int_for_root = pkt_to_int pkt in
+      let r_i = "r_" ^ (string_of_int int_for_root) in
+      let rank_for_root = State.lookup r_i s in
+      let s' = State.rebind r_i (rank_for_root +. (float_of_int n)) s in
+      let rank_for_root = Rank.create rank_for_root time in
+      ([ (int_for_root, rank_for_root); (0, Rank.create 0.0 time) ], s', Time.epoch)
 
-  let control : Control.t =
-    {
-      s = State.create 3;
-      q = Pieotree.create topology;
-      z = scheduling_transaction;
-    }
+    let z_out s pkt = 
+      (* To pop, we pop our PIFO tree; say we obtain packet `p` from the `i`th flow.
+        1. for `j` among `turn`, `(turn + 1) mod n`, `(turn + 2) mod n`, ..., `(i - 1) mod n`, increment `r_j += n`
+          - for example, if `n = 5`, `turn = 3`, and `i = 2`, we'd increment `r_j` for `j = 3, 4, 0, 1`.
+          - when `turn = i`, this scheme makes it so we'd update no rank ptr.
+        2. and update `turn = (turn + 1) mod n`.
+      *)
 
-  let simulate sim_length pkts =
-    Control.simulate sim_length 0.001 poprate pkts control
-end
+      let turn = State.lookup "turn" s in
+      let turn' = ((pkt_to_int pkt) + 1) mod n |> float_of_int in 
+      let s' = State.rebind "turn" turn' s in
+      let skipped = who_skip (pkt_to_int pkt) (int_of_float turn) in
+      let f s i = 
+        let r_i = "r_" ^ (string_of_int i) in
+        State.rebind r_i (State.lookup r_i s +. (float_of_int n)) s
+      in
+      List.fold_left f s' skipped
+
+    let init_state = 
+      (* Initalize state by 
+        1. setting rank ptrs `r_i = i` for `i = 0, ..., n-1`
+        2. and setting `turn = 0`.
+      *)
+      let zero_to_n = List.init n Fun.id in
+      let s = State.create (n + 1) |> State.rebind "turn" 0.0 in
+      let f s x = State.rebind ("r_" ^ (string_of_int x)) (float_of_int x) s in
+      List.fold_left f s zero_to_n
+
+    let topology = Topo.one_level_n_ary n
+
+    let control : Control.t =
+      {
+        s = init_state;
+        q = Pieotree.create topology;
+        z_in = z_in;
+        z_out = z_out;
+      }
+
+    let simulate sim_length pkts = 
+      Control.simulate sim_length 0.001 poprate pkts control
+  end : Alg_t
+)
+
+module RRobin_Ternary = (val rrobin 3)
 
 let wfq_helper s weight var_last_finish pkt_len time : Rank.t * State.t =
   (* The WFQ-style algorithms have a common pattern,
@@ -150,7 +195,12 @@ module WFQ_Ternary : Alg_t = struct
     |> State.rebind "C_weight" 0.3
 
   let control : Control.t =
-    { s = init_state; q = Pieotree.create topology; z = scheduling_transaction }
+    { 
+      s = init_state; 
+      q = Pieotree.create topology; 
+      z_in = scheduling_transaction; 
+      z_out = fun s _ -> s;
+    }
 
   let simulate sim_length pkts =
     Control.simulate sim_length 0.001 poprate pkts control
@@ -221,7 +271,8 @@ module HPFQ_Binary : Alg_t = struct
         |> State.rebind "B_weight" 0.25
         |> State.rebind "C_weight" 0.2;
       q = Pieotree.create topology;
-      z = scheduling_transaction;
+      z_in = scheduling_transaction;
+      z_out = fun s _ -> s;
     }
 
   let simulate sim_length pkts =
@@ -287,7 +338,8 @@ module TwoPol_Ternary : Alg_t = struct
         |> State.rebind "B_weight" 0.1
         |> State.rebind "CDE_weight" 0.8;
       q = Pieotree.create topology;
-      z = scheduling_transaction;
+      z_in = scheduling_transaction;
+      z_out = fun s _ -> s;
     }
 
   let simulate sim_length pkts =
@@ -414,7 +466,8 @@ module ThreePol_Ternary : Alg_t = struct
         |> State.rebind "F_weight" 0.4
         |> State.rebind "G_weight" 0.5;
       q = Pieotree.create topology;
-      z = scheduling_transaction;
+      z_in = scheduling_transaction;
+      z_out = fun s _ -> s;
     }
 
   let simulate sim_length pkts =
@@ -450,12 +503,17 @@ module Alg2B (Alg : Alg_t) : Alg_t = struct
   let topology, f = Topo.build_binary Alg.topology
   let f_tilde = Topo.lift_tilde f Alg.topology
 
-  let z' s pkt =
-    let pt, s', ts = Alg.control.z s pkt in
+  let z_in' s pkt =
+    let pt, s', ts = Alg.control.z_in s pkt in
     (f_tilde pt, s', ts)
 
   let control : Control.t =
-    { s = Alg.control.s; q = Pieotree.create topology; z = z' }
+    { 
+      s = Alg.control.s; 
+      q = Pieotree.create topology; 
+      z_in = z_in'; 
+      z_out = Alg.control.z_out;
+    }
 
   let simulate sim_length pkts =
     Control.simulate sim_length 0.001 poprate pkts control
@@ -492,7 +550,8 @@ module Extension_Flat : Alg_t = struct
     {
       s = State.create 1;
       q = Pieotree.create topology;
-      z = scheduling_transaction;
+      z_in = scheduling_transaction;
+      z_out = fun s _ -> s;
     }
 
   let simulate sim_length pkts =
@@ -511,12 +570,17 @@ module Alg2T (Alg : Alg_t) : Alg_t = struct
   *)
   let f_tilde = Topo.lift_tilde f Alg.topology
 
-  let z' s pkt =
-    let pt, s', ts = Alg.control.z s pkt in
+  let z_in' s pkt =
+    let pt, s', ts = Alg.control.z_in s pkt in
     (f_tilde pt, s', ts)
 
   let control : Control.t =
-    { s = Alg.control.s; q = Pieotree.create topology; z = z' }
+    { 
+      s = Alg.control.s; 
+      q = Pieotree.create topology; 
+      z_in = z_in';
+      z_out = Alg.control.z_out;
+    }
 
   let simulate sim_length pkts =
     Control.simulate sim_length 0.001 poprate pkts control
@@ -545,7 +609,8 @@ module Shifted_FCFS_Ternary : Alg_t = struct
     {
       s = State.create 1;
       q = Pieotree.create topology;
-      z = scheduling_transaction;
+      z_in = scheduling_transaction;
+      z_out = fun s _ -> s;
     }
 
   let simulate sim_length pkts =
@@ -594,7 +659,12 @@ module Rate_Limit_WFQ_Quaternary : Alg_t = struct
     |> State.rebind "C_throttle" 78.0
 
   let control : Control.t =
-    { s = init_state; q = Pieotree.create topology; z = scheduling_transaction }
+    { 
+      s = init_state; 
+      q = Pieotree.create topology; 
+      z_in = scheduling_transaction;
+      z_out = fun s _ -> s;
+    }
 
   let simulate sim_length pkts =
     Control.simulate sim_length 0.001 poprate pkts control

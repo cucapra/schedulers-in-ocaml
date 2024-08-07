@@ -246,6 +246,8 @@ let rec lift_tilde (f : map_t) tree (path : Path.t) =
 let one_level_quaternary = Node [Star; Star; Star; Star]
 let one_level_ternary = Node [ Star; Star; Star ]
 let one_level_binary = Node [ Star; Star ]
+let one_level_n_ary n = Node (List.init n (fun _ -> Star))
+
 let two_level_binary = Node [ Node [ Star; Star ]; Star ]
 let two_level_ternary = Node [ Star; Star; Node [ Star; Star; Star ] ]
 

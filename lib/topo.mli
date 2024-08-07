@@ -12,6 +12,8 @@ val lift_tilde : map_t -> t -> Path.t -> Path.t
 val one_level_quaternary : t
 val one_level_ternary : t
 val one_level_binary : t
+val one_level_n_ary : int -> t
+
 val two_level_binary : t
 val two_level_ternary : t
 val three_level_ternary : t

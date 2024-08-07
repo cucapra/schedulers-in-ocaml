@@ -154,19 +154,34 @@ let write_to_csv ts overdue filename =
   let ecsv = Csv.input_all (Csv.of_string payload) in
   Csv.save filename ecsv
 
+let mac_addr_to_flow s : Flow.t = match s with
+  | "10:10:10:10:10:10" -> A
+  | "20:20:20:20:20:20" -> B
+  | "30:30:30:30:30:30" -> C
+  | "40:40:40:40:40:40" -> D
+  | "50:50:50:50:50:50" -> E
+  | "60:60:60:60:60:60" -> F
+  | "70:70:70:70:70:70" -> G
+  | n -> failwith Printf.(sprintf "Unknown MAC address: %s." n)
+
 let find_flow t =
   (* In pcap_gen.py, we create packets with sources based on their MAC addresses.
-     After going through our parser, those packets' sources get converted into
-     inscrutable integers.
-     This little function converts those integers back into human-readable strings.
+     After going through our parser, those sources get converted into decimals, as follows:
+     - start with MAC address `s`
+     - remove the `:`s from `s`, giving a hexadecimal number
+     - convert this number to decimal
+     This function converts those integers back into human-readable strings:
+     - convert to decimal to hex
+     - insert `:`s after every two digits
+     Then, it looks up the associated `flow` with `mac_addr_to_flow`.
+
   *)
-  let open Flow in
-  match src t with
-  | 17661175009296 -> A (* Used to be address 10:10:10:10:10:10. *)
-  | 35322350018592 -> B (* 20...*)
-  | 52983525027888 -> C (* 30...*)
-  | 70644700037184 -> D (* 40...*)
-  | 88305875046480 -> E (* 50...*)
-  | 105967050055776 -> F (* 60...*)
-  | 123628225065072 -> G (* 70...*)
-  | n -> failwith Printf.(sprintf "Unknown source address: %d." n)
+  let hex = Printf.sprintf "%x" (src t) in
+  let n = String.length hex in
+  let buf = Buffer.create (3 * (n / 2) - 1) in
+  let f i c =
+    Buffer.add_char buf c;
+    if i mod 2 = 1 && i < n - 1 then Buffer.add_char buf ':' else ()
+  in
+  String.iteri f hex; 
+  Buffer.contents buf |> mac_addr_to_flow

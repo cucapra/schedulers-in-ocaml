@@ -1,5 +1,10 @@
-type sched_t = State.t -> Packet.t -> Path.t * State.t * Time.t
-type t = { s : State.t; q : Pieotree.t; z : sched_t }
+type t = 
+  { 
+    s : State.t; 
+    q : Pieotree.t; 
+    z_in : State.t -> Packet.t -> Path.t * State.t * Time.t;
+    z_out : State.t -> Packet.t -> State.t
+  }
 
 let simulate sim_length sleep pop_tick flow t =
   (* The user gives us:
@@ -53,7 +58,8 @@ let simulate sim_length sleep pop_tick flow t =
         | None -> failwith "The tree was nonempty, but pop returned None."
         | Some (pkt, tree') ->
             (* Made progress by popping. Add to answer and recurse. *)
-            helper flow time 0.0 state tree' (Packet.punch_out pkt time :: ans)
+            let state' = t.z_out state pkt in
+            helper flow time 0.0 state' tree' (Packet.punch_out pkt time :: ans)
     else
       (* If no pop-work is due, try to push. *)
       match flow with
@@ -65,7 +71,7 @@ let simulate sim_length sleep pop_tick flow t =
           (* But is it ready to be scheduled? *)
           if time >= Packet.time pkt then
             (* Yes. Push it. *)
-            let path, state', ts = t.z state pkt in
+            let path, state', ts = t.z_in state pkt in
             let tree' = Pieotree.push tree ts (Packet.punch_in pkt time) path in
             (* Recurse with tsp = 0.0. *)
             helper flow' time tsp state' tree' ans
