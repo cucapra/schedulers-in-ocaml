@@ -165,6 +165,17 @@ let mac_addr_to_flow s : Flow.t = match s with
   | n -> failwith Printf.(sprintf "Unknown MAC address: %s." n)
 
 let find_flow t =
+  (* In pcap_gen.py, we create packets with sources based on their MAC addresses.
+     After going through our parser, those sources get converted into decimals, as follows:
+     - start with MAC address `s`
+     - remove the `:`s from `s`, giving a hexadecimal number
+     - convert this number to decimal
+     This function converts those integers back into human-readable strings:
+     - convert to decimal to hex
+     - insert `:`s after every two digits
+     Then, it looks up the associated `flow` with `mac_addr_to_flow`.
+
+  *)
   let hex = Printf.sprintf "%x" (src t) in
   let n = String.length hex in
   let buf = Buffer.create (3 * (n / 2) - 1) in

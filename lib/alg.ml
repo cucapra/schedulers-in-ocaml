@@ -36,7 +36,7 @@ module FCFS_Ternary : Alg_t = struct
       s = State.create 1;
       q = Pieotree.create topology;
       z_in = scheduling_transaction;
-      z_out = fun x -> fun _ -> x;
+      z_out = fun s _ -> s;
     }
 
   let simulate sim_length pkts =
@@ -65,7 +65,7 @@ module Strict_Ternary : Alg_t = struct
       s = State.create 1;
       q = Pieotree.create topology;
       z_in = scheduling_transaction;
-      z_out = fun x -> fun _ -> x;
+      z_out = fun s _ -> s;
     }
 
   let simulate sim_length pkts =
@@ -184,7 +184,7 @@ module WFQ_Ternary : Alg_t = struct
       s = init_state; 
       q = Pieotree.create topology; 
       z_in = scheduling_transaction; 
-      z_out = fun x -> fun _ -> x;
+      z_out = fun s _ -> s;
     }
 
   let simulate sim_length pkts =
@@ -257,7 +257,7 @@ module HPFQ_Binary : Alg_t = struct
         |> State.rebind "C_weight" 0.2;
       q = Pieotree.create topology;
       z_in = scheduling_transaction;
-      z_out = fun x -> fun _ -> x;
+      z_out = fun s _ -> s;
     }
 
   let simulate sim_length pkts =
@@ -324,7 +324,7 @@ module TwoPol_Ternary : Alg_t = struct
         |> State.rebind "CDE_weight" 0.8;
       q = Pieotree.create topology;
       z_in = scheduling_transaction;
-      z_out = fun x -> fun _ -> x;
+      z_out = fun s _ -> s;
     }
 
   let simulate sim_length pkts =
@@ -452,7 +452,7 @@ module ThreePol_Ternary : Alg_t = struct
         |> State.rebind "G_weight" 0.5;
       q = Pieotree.create topology;
       z_in = scheduling_transaction;
-      z_out = fun x -> fun _ -> x;
+      z_out = fun s _ -> s;
     }
 
   let simulate sim_length pkts =
@@ -536,7 +536,7 @@ module Extension_Flat : Alg_t = struct
       s = State.create 1;
       q = Pieotree.create topology;
       z_in = scheduling_transaction;
-      z_out = fun x -> fun _ -> x;
+      z_out = fun s _ -> s;
     }
 
   let simulate sim_length pkts =
@@ -595,7 +595,7 @@ module Shifted_FCFS_Ternary : Alg_t = struct
       s = State.create 1;
       q = Pieotree.create topology;
       z_in = scheduling_transaction;
-      z_out = fun x -> fun _ -> x;
+      z_out = fun s _ -> s;
     }
 
   let simulate sim_length pkts =
@@ -648,7 +648,7 @@ module Rate_Limit_WFQ_Quaternary : Alg_t = struct
       s = init_state; 
       q = Pieotree.create topology; 
       z_in = scheduling_transaction;
-      z_out = fun x -> fun _ -> x;
+      z_out = fun s _ -> s;
     }
 
   let simulate sim_length pkts =
