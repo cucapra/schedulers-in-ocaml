@@ -74,7 +74,7 @@ end
 
 let rrobin n = (
   module struct
-    (* n-flow Round-Robin *)
+    (* `n`-flow Round-Robin on an `n`-ary tree. *)
     let _ = assert (n <= 7 && n > 0)
 
     let who_skip pop turn = 
@@ -97,6 +97,10 @@ let rrobin n = (
       | G -> 6
 
     let z_in s pkt = 
+      (* To push packet `p` from the `i`th flow,
+        1. we push `p` into our PIFO tree with path `(i, r_i) :: (v's arrival time)`
+        2. and increment `r_i += n`.
+      *)
       let time = Packet.time pkt in
       let int_for_root = pkt_to_int pkt in
       let r_i = "r_" ^ (string_of_int int_for_root) in
@@ -106,6 +110,13 @@ let rrobin n = (
       ([ (int_for_root, rank_for_root); (0, Rank.create 0.0 time) ], s', Time.epoch)
 
     let z_out s pkt = 
+      (* To pop, we pop our PIFO tree; say we obtain packet `p` from the `i`th flow.
+        1. for `j` among `turn`, `(turn + 1) mod n`, `(turn + 2) mod n`, ..., `(i - 1) mod n`, increment `r_j += n`
+          - for example, if `n = 5`, `turn = 3`, and `i = 2`, we'd increment `r_j` for `j = 3, 4, 0, 1`.
+          - when `turn = i`, this scheme makes it so we'd update no rank ptr.
+        2. and update `turn = (turn + 1) mod n`.
+      *)
+
       let turn = State.lookup "turn" s in
       let turn' = ((pkt_to_int pkt) + 1) mod n |> float_of_int in 
       let s' = State.rebind "turn" turn' s in
@@ -117,6 +128,10 @@ let rrobin n = (
       List.fold_left f s' skipped
 
     let init_state = 
+      (* Initalize state by 
+        1. setting rank ptrs `r_i = i` for `i = 0, ..., n-1`
+        2. and setting `turn = 0`.
+      *)
       let zero_to_n = List.init n Fun.id in
       let s = State.create (n + 1) |> State.rebind "turn" 0.0 in
       let f s x = State.rebind ("r_" ^ (string_of_int x)) (float_of_int x) s in
